@@ -1,4 +1,4 @@
-package fr.soyhuce.gpstracker;
+package fr.soyhuce.gpstracker.interfaces;
 
 import android.location.Location;
 

@@ -5,31 +5,28 @@ import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
-import android.location.Location;
 import android.location.LocationManager;
-import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.util.Log;
 
 import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationAvailability;
-import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
 import com.google.android.gms.location.LocationServices;
-import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.Task;
+
+import fr.soyhuce.gpstracker.interfaces.LocationListener;
 
 
 /**
  * Created by mathieuedet on 02/03/2018.
  */
 
-public class GPSTracker extends LocationCallback implements OnCompleteListener<Location> {
+public class GPSTracker {
 
     private static final String TAG = GPSTracker.class.getName();
     private static final GPSTracker INSTANCE = new GPSTracker();
+
+    private LocationHandler locationHandler;
 
     public static final int REQUEST_CODE_LOCATION_PERMISSION = 100;
 
@@ -41,9 +38,10 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
 
     private Context context;
     private FusedLocationProviderClient fusedLocationProviderClient;
-    private LocationListener locationListener;
 
-    private GPSTracker() { /* Private constructor */ }
+    private GPSTracker() {
+        locationHandler = new LocationHandler();
+    }
 
     public static GPSTracker getInstance() {
         return INSTANCE;
@@ -88,13 +86,11 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
                 .setSmallestDisplacement(smallestDisplacementMeters)
                 .setPriority(priority);
 
-        this.locationListener = locationListener;
-
-        this.fusedLocationProviderClient.requestLocationUpdates(currentLocationRequest, this, null);
+        this.fusedLocationProviderClient.requestLocationUpdates(currentLocationRequest, locationHandler, null);
     }
 
     public void stopLocationUpdate(){
-        this.fusedLocationProviderClient.removeLocationUpdates(this);
+        this.fusedLocationProviderClient.removeLocationUpdates(locationHandler);
     }
 
     /***
@@ -105,7 +101,12 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
         requestLocationUpdate(activity, locationListener, DEFAULT_INTERVAL_LOCATION_REQUEST, DEFAULT_FASTEST_INTERVAL_LOCATION_REQUEST, DEFAULT_MAX_WAIT_TIME_LOCATION_REQUEST, DEFAULT_SMALLEST_DISPLACEMENT_LOCATION_REQUEST, DEFAULT_PRIORITY_LOCATION_REQUEST);
     }
 
-    private boolean requestLocationPermissionIfNeeded(Activity activity){
+    /***
+     * Permet de demander la runtime permission pour l'accès à la localisation précise (ACCESS_FINE_LOCATION) si celle-ci n'est pas déjà accordée
+     * @param activity Activity à partir de laquelle la géolocalisation est effectuée (implémenter ``` onRequestPermissionsResult``` au sein de l'activity)
+     * @return true si la permission a déjà été accordé, sinon false
+     */
+    public boolean requestLocationPermissionIfNeeded(Activity activity){
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(activity, new String[]{ Manifest.permission.ACCESS_FINE_LOCATION }, REQUEST_CODE_LOCATION_PERMISSION);
             return false;
@@ -113,6 +114,11 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
         return true;
     }
 
+    /***
+     * Permet d'obtenir la dernière position GPS connue par le téléphone (éventuellement depuis une autre app)
+     * @param activity Activity à partir de laquelle la géolocalisation est effectuée (implémenter ``` onRequestPermissionsResult``` au sein de l'activity)
+     * @param locationListener Classe implémentant LocationListener pour récupérer chaque maj de position ou une erreur en cas d'erreur
+     */
     @SuppressLint("MissingPermission")
     public void getLastLocationAsync(Activity activity, LocationListener locationListener){
 
@@ -120,8 +126,8 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
             return;
         }
 
-        this.locationListener = locationListener;
-        this.fusedLocationProviderClient.getLastLocation().addOnCompleteListener(this);
+        this.locationHandler.setLocationListener(locationListener);
+        this.fusedLocationProviderClient.getLastLocation().addOnCompleteListener(locationHandler);
     }
 
     private boolean canCheckLocation(Activity activity){
@@ -146,59 +152,6 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
     }
 
 
-    // GET LAST LOCATION UPDATE
-
-    @Override
-    public void onComplete(@NonNull Task<Location> task) {
-        if(task.isSuccessful() && task.getResult() != null && !task.getResult().isFromMockProvider()){
-            broadcastLocation(task);
-        }else{
-            broadcastLocationError(task);
-        }
-    }
-
-    private void broadcastLocation(Task<Location> task){
-        if(locationListener != null){
-            locationListener.onGetLocation(task.getResult());
-        }
-    }
-
-    private void broadcastLocationError(Task<Location> task){
-        if(task.getResult() != null && task.getResult().isFromMockProvider()){
-            locationListener.onLocationError(new MockLocationException());
-            return;
-        }
-
-        if(task.isSuccessful() && task.getResult() == null && task.getException() == null){
-            locationListener.onLocationError(new NoLocationException());
-            return;
-        }
-
-        if(locationListener != null && !task.isSuccessful() && task.getException() != null){
-            locationListener.onLocationError(task.getException());
-        }
-    }
-
-
-
-    // LOCATION CALLBACK
-
-    @Override
-    public void onLocationResult(LocationResult locationResult) {
-        super.onLocationResult(locationResult);
-        if(locationListener != null){
-            locationListener.onGetLocation(locationResult.getLastLocation());
-        }
-    }
-
-    @Override
-    public void onLocationAvailability(LocationAvailability locationAvailability) {
-        super.onLocationAvailability(locationAvailability);
-        if(locationListener != null){
-            locationListener.onLocationAvailabilityChanged(locationAvailability.isLocationAvailable());
-        }
-    }
-
     public void setContext(Context context) {
         this.context = context;
         this.fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(context);
@@ -206,17 +159,4 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
 
 
 
-    public class MockLocationException extends Exception{
-        @Override
-        public String getMessage() {
-            return "Mock location not permits for the application.";
-        }
-    }
-
-    public class NoLocationException extends Exception{
-        @Override
-        public String getMessage() {
-            return "No location detected";
-        }
-    }
 }

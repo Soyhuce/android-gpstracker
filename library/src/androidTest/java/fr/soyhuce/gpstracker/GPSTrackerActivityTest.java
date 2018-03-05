@@ -10,6 +10,8 @@ import android.support.v4.content.PermissionChecker;
 import android.support.v7.app.AppCompatActivity;
 import android.widget.Toast;
 
+import fr.soyhuce.gpstracker.interfaces.LocationListener;
+
 /**
  * Created by mathieuedet on 05/03/2018.
  */
