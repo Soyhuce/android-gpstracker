@@ -55,12 +55,11 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
      * Plus d'informations sur les paramètres <a href="https://developers.google.com/android/reference/com/google/android/gms/location/LocationRequest.html">ici</a>
      * @param locationListener Classe implémentant LocationListener pour récupérer chaque maj de position ou une erreur en cas d'erreur
      * @param intervalMillis Interval de mise à jour (possible mais non conseillé de mettre 0 car les mises à jour de position sont amené à être de plus en plus rapide)
-     *                              ET doit être plus rapide que {@code intervalMillis}
      * @param fastestIntervalMillis Interval le plus rapide de mise à jour (possible mais non conseillé de mettre 0 car les mises à jour de position sont amené à être de plus en plus rapide)
      *                              Est inférieure à {@code intervalMillis} et peut permettre de récupérer une position avant la fin de la valeur de {@code intervalMillis} si une autre app demande la localisation et l'obtient
      * @param maxWaitTimeMillis Temps maximum en millisecondes à attendre (Attention ! Valeur inexacte selon la doc officielle Android)
      * @param smallestDisplacementMeters Déplacement minimum entre deux maj de position en mètres
-     * @param priority priority
+     * @param priority Priorité de la requete de géolocalisation (LocationRequest.PRIORITY_HIGH_ACCURACY ou LocationRequest.PRIORITY_BALANCED_POWER_ACCURACY ou LocationRequest.PRIORITY_LOW_POWER)
      */
     @SuppressLint("MissingPermission")
     public void requestLocationUpdate(Activity activity, LocationListener locationListener,
@@ -160,7 +159,7 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
 
     private void broadcastLocation(Task<Location> task){
         if(locationListener != null){
-            locationListener.onNewLocation(task.getResult());
+            locationListener.onGetLocation(task.getResult());
         }
     }
 
@@ -188,7 +187,7 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
     public void onLocationResult(LocationResult locationResult) {
         super.onLocationResult(locationResult);
         if(locationListener != null){
-            locationListener.onNewLocation(locationResult.getLastLocation());
+            locationListener.onGetLocation(locationResult.getLastLocation());
         }
     }
 
@@ -207,14 +206,14 @@ public class GPSTracker extends LocationCallback implements OnCompleteListener<L
 
 
 
-    private class MockLocationException extends Exception{
+    public class MockLocationException extends Exception{
         @Override
         public String getMessage() {
             return "Mock location not permits for the application.";
         }
     }
 
-    private class NoLocationException extends Exception{
+    public class NoLocationException extends Exception{
         @Override
         public String getMessage() {
             return "No location detected";

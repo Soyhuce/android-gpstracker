@@ -54,7 +54,7 @@ public class GPSTrackerActivityTest extends AppCompatActivity implements Locatio
 
 
     @Override
-    public void onNewLocation(Location location) {
+    public void onGetLocation(Location location) {
         displayLocation(location);
     }
 
